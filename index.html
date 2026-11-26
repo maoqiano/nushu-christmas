@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>千年女书 · 手势圣诞树</title>
+    <meta name="description" content="挥手散开圣诞树，捏合看立体女书，双手取景看圣诞插画，指尖比心唤出爱心。">
+    <meta name="theme-color" content="#050d1a">
+
+    <!-- 分享到社交平台时的预览卡片 -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="千年女书 · 手势圣诞树">
+    <meta property="og:description" content="挥手散开圣诞树，捏合看立体女书，双手取景看圣诞插画，指尖比心唤出爱心。">
+    <meta property="og:url" content="https://maoqiano.github.io/nushu-christmas/">
+    <meta property="og:image" content="https://maoqiano.github.io/nushu-christmas/assets/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <link rel="stylesheet" href="css/style.css">
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./vendor/three/build/three.module.min.js",
+            "three/addons/": "./vendor/three/examples/jsm/",
+            "@mediapipe/tasks-vision": "./vendor/mediapipe/vision_bundle.mjs"
+        }
+    }
+    </script>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="spinner" aria-hidden="true"></div>
+        <div class="loader-text" role="status">Loading Memories</div>
+        <button class="upload-btn loader-retry" id="loader-retry" type="button" hidden>重新加载</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <h1>Merry Christmas</h1>
+
+        <div class="controls-wrapper" data-capture-hidden>
+            <div class="action-buttons">
+                <button class="upload-btn photo-upload" id="photo-btn" type="button">更换照片</button>
+                <button class="upload-btn" id="save-btn" type="button">截图</button>
+                <button class="upload-btn" id="help-btn" type="button">教程</button>
+                <input type="file" id="file-input" accept="image/*" hidden>
+            </div>
+            <p class="hint-text">
+                拖拽旋转 · 滚轮缩放<br>
+                T 聚合 · S 散开 · F 看字 · P 看照片<br>
+                L 爱心 · H 隐藏界面 · D 调试
+            </p>
+        </div>
+
+        <aside id="word-caption" aria-label="女书与简体中文对照" aria-live="polite" hidden>
+            <dl>
+                <div>
+                    <dt>女书</dt>
+                    <dd id="word-glyphs"></dd>
+                </div>
+                <div>
+                    <dt>简体中文</dt>
+                    <dd id="word-translation" lang="zh-Hans"></dd>
+                </div>
+            </dl>
+        </aside>
+    </div>
+
+    <!-- 首次进入的引导：不讲清楚要做什么手势，用户开了摄像头也只会发愣 -->
+    <div id="onboarding" hidden>
+        <div class="onboarding-card">
+            <h2>用手势控制这棵树</h2>
+            <p class="camera-help">手势没反应时，先检查摄像头权限。在浏览器的网站设置中允许本页使用摄像头，再刷新。开启后，页面上会显示实时摄像头画面。</p>
+            <ul class="gesture-list">
+                <li>
+                    <span class="gesture-emoji">✊</span>
+                    <strong>握拳</strong>
+                    <span>粒子聚合成圣诞树</span>
+                </li>
+                <li>
+                    <span class="gesture-emoji">🖐️</span>
+                    <strong>张开手掌</strong>
+                    <span>散成星云。手掌靠近摄像头放大，移远缩小，左右移动可转动视角</span>
+                </li>
+                <li>
+                    <span class="gesture-emoji">🤏</span>
+                    <strong>捏合手指</strong>
+                    <span>放大女书挂件并查看对照。保持捏合并移动手可以旋转挂件，松开再捏可以换词</span>
+                </li>
+                <li>
+                    <span class="gesture-emoji">❤️</span>
+                    <strong>指尖比心</strong>
+                    <span>交叉拇指和食指并保持姿势，爱心会从左上向右下飘过。松手后停止生成</span>
+                </li>
+                <li>
+                    <span class="gesture-emoji" aria-hidden="true">📸</span>
+                    <strong>双手取景</strong>
+                    <span>双手比 L 框住画面。松手再做可轮流查看四张照片</span>
+                </li>
+            </ul>
+            <p class="onboarding-note">
+                <kbd>T</kbd> 聚合 · <kbd>S</kbd> 散开 · <kbd>F</kbd> 看字 · <kbd>P</kbd> 看照片 · <kbd>L</kbd> 爱心
+            </p>
+            <button class="upload-btn onboarding-start" id="onboarding-close" type="button">开始</button>
+        </div>
+    </div>
+
+    <div id="webcam-wrapper">
+        <video id="webcam" autoplay playsinline muted></video>
+        <div id="debug-info">—</div>
+        <div id="status-info">Initializing…</div>
+    </div>
+
+    <script type="module">
+        import('./js/main.js').catch((error) => {
+            console.error('[tree] 场景启动失败', error);
+            const loader = document.getElementById('loader');
+            loader.classList.add('loader-error');
+            loader.querySelector('.loader-text').textContent = /WebGL/i.test(error.message)
+                ? '3D 渲染启动失败。请在支持 WebGL 的浏览器中打开。'
+                : '场景加载失败。请重新加载页面。';
+            const retry = document.getElementById('loader-retry');
+            retry.hidden = false;
+            retry.addEventListener('click', () => window.location.reload());
+        });
+    </script>
+</body>
+</html>
